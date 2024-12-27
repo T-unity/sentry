@@ -21,5 +21,5 @@ func main() {
 		// Flush buffered events before the program terminates.
 		defer sentry.Flush(2 * time.Second)
 
-		sentry.CaptureMessage("It works!")
+		sentry.CaptureMessage("Oooooooops!!")
 }
