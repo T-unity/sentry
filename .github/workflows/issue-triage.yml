@@ -1,4 +1,4 @@
-name: Issue Triage with Specific Label
+name: AI Triage
 
 on:
   issues:
@@ -8,9 +8,6 @@ jobs:
   triage:
     runs-on: ubuntu-latest
 
-    # 条件付き実行:
-    # １．Issueの作成イベント (opened) でかつ、ラベル一覧に "bug auto triage" がある
-    # ２．Issueにラベルが追加されたイベント (labeled) でかつ、追加されたラベルが "bug auto triage" である
     if: |
       (
         github.event.action == 'opened' &&
@@ -22,12 +19,27 @@ jobs:
         github.event.label.name == 'bug auto triage'
       )
     steps:
-      - name: Check out
+      - name: Check out code
         uses: actions/checkout@v3
 
-      - name: Triage Issue
-        run: |
-          echo "Issue Title: ${{ github.event.issue.title }}"
-          echo "Action: ${{ github.event.action }}"
-          echo "Labels: ${{ toJson(github.event.issue.labels) }}"
-          echo "Triggered by label or opened with label"
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16.x'
+
+      - name: Install Dependencies
+        run: npm install openai@3.2.1
+
+      - name: AI Triage
+        run: node scripts/triage-ai.js
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+
+      - name: Create Comment
+        uses: actions-ecosystem/action-create-comment@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          body: ${{ steps.ai-triage-parse.outputs.commentBody }}
