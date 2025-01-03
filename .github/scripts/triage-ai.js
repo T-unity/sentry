@@ -1,13 +1,6 @@
-const { Configuration, OpenAIApi } = require("openai");
-const fs = require("fs");
-
 (async () => {
   try {
-    const configuration = new Configuration({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
-    const openai = new OpenAIApi(configuration);
-
+    const apiKey = process.env.OPENAI_API_KEY;
     const issueBody = process.env.ISSUE_BODY || "";
     const issueTitle = process.env.ISSUE_TITLE || "";
     const issueUrl = process.env.ISSUE_URL || "";
@@ -25,26 +18,44 @@ ${issueUrl}
 ${issueBody}
 `;
 
-    const response = await openai.createChatCompletion({
+    const endpoint = "https://api.openai.com/v1/chat/completions";
+
+    const requestBody = {
       model: "gpt-4o-mini",
-      messages: [{
-        role: "user",
-        content: prompt
-      }],
+      messages: [
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
       max_tokens: 500,
       temperature: 0.2,
+    };
+
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(requestBody),
     });
 
-    const aiResult = response.data.choices[0].message.content;
+    if (!response.ok) {
+      throw new Error(
+        `OpenAI API error: ${response.status} - ${await response.text()}`
+      );
+    }
+
+    const data = await response.json();
+
+    const aiResult = data?.choices?.[0]?.message?.content || "(No response)";
 
     console.log("AI Triage Result:\n", aiResult);
-
-    fs.writeFileSync("ai_tria_result.txt", aiResult);
-
     console.log(`::set-output name=commentBody::${aiResult.replace(/\r?\n/g, "%0A")}`);
 
   } catch (error) {
-    console.error(error);
+    console.error("Error in triage-ai script:", error);
     process.exit(1);
   }
 })();
