@@ -132,7 +132,7 @@ ${codeSnippets}
  * 例: GitHub APIからコードスニペットを取得
  */
 async function fetchCodeSnippetFromGitHub(token, owner, repo, path, ref, centerLine, contextLines) {
-  const shortPath = filename.split("/").pop();
+  const shortPath = path.split("/").pop();
   const url = `https://api.github.com/repos/${owner}/${repo}/contents/${shortPath}?ref=${ref}`;
   console.log("Fetching URL:", url);
 
@@ -146,11 +146,11 @@ async function fetchCodeSnippetFromGitHub(token, owner, repo, path, ref, centerL
     throw new Error(`Failed to fetch file from GitHub: ${resp.status} - ${await resp.text()}`);
   }
   const json = await resp.json();
-  
+
   const contentBase64 = json.content;
   const buff = Buffer.from(contentBase64, 'base64');
   const fileContent = buff.toString('utf-8');
-  
+
   const lines = fileContent.split('\n');
   const start = Math.max(0, centerLine - contextLines - 1); // 1-based -> 0-based
   const end = Math.min(lines.length, centerLine + contextLines);
