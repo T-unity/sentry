@@ -95,8 +95,10 @@ ${codeSnippets}
  * → GitHub REST API /contents でファイルを取得し、行番号周辺を抜き出す例
  */
 async function fetchCodeSnippetFromGitHub(token, owner, repo, path, ref, centerLine, contextLines) {
-  const url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${ref}`;
-  console.log("Fetching URL:", url);
+  // const url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${ref}`;
+  // FIXME:
+  const url = `https://api.github.com/repos/${owner}/${repo}/contents/main.go?ref=${ref}`;
+  // console.log("Fetching URL:", url);
 
   const resp = await fetch(url, {
     headers: {
