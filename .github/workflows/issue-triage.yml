@@ -31,7 +31,7 @@ jobs:
         run: npm install openai@3.2.1
 
       - name: AI Triage
-        run: node scripts/triage-ai.js
+        run: node .github/scripts/aiReview.js
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ISSUE_BODY: ${{ github.event.issue.body }}
