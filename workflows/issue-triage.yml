@@ -1,0 +1,33 @@
+name: Issue Triage with Specific Label
+
+on:
+  issues:
+    types: [opened, labeled]
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+
+    # 条件付き実行:
+    # １．Issueの作成イベント (opened) でかつ、ラベル一覧に "bug auto triage" がある
+    # ２．Issueにラベルが追加されたイベント (labeled) でかつ、追加されたラベルが "bug auto triage" である
+    if: |
+      (
+        github.event.action == 'opened' &&
+        contains(toJson(github.event.issue.labels), 'bug auto triage')
+      )
+      ||
+      (
+        github.event.action == 'labeled' &&
+        github.event.label.name == 'bug auto triage'
+      )
+    steps:
+      - name: Check out
+        uses: actions/checkout@v3
+
+      - name: Triage Issue
+        run: |
+          echo "Issue Title: ${{ github.event.issue.title }}"
+          echo "Action: ${{ github.event.action }}"
+          echo "Labels: ${{ toJson(github.event.issue.labels) }}"
+          echo "Triggered by label or opened with label"
