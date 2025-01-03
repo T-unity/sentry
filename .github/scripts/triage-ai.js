@@ -1,3 +1,7 @@
+import {exec} from 'child_process';
+import {promisify} from 'util';
+const execAsync = promisify(exec);
+
 (async () => {
   try {
     const apiKey = process.env.OPENAI_API_KEY;
@@ -6,42 +10,57 @@
     const issueUrl = process.env.ISSUE_URL || "";
     const ghToken = process.env.GITHUB_TOKEN;
     
-    // 1. スタックトレース情報をIssue本文から抽出
     const stackLines = issueBody.match(/\|\s*`([^`]+)`\s*\|\s*`([^`]+)`\s*\|\s*`(\d+)`\s*\|/g) || [];
-    let codeSnippets = "";
     
+    let lastCommitterEmail = null;  
+    let codeSnippets = "";
+
     for (const line of stackLines) {
       const match = line.match(/\|\s*`([^`]+)`\s*\|\s*`([^`]+)`\s*\|\s*`(\d+)`\s*\|/);
       if (!match) continue;
-      const filename = match[1]; // e.g. "main.go"
-      const lineno = parseInt(match[3]); // e.g. 25
+      const filename = match[1];
+      const lineno = parseInt(match[3]);
 
-      // 2. GitHub API で前後5行のコードを取得する (現時点では main.go を強制)
+      const blameCmd = `git blame -L ${lineno},${lineno} ${filename}`;
+      console.log(`Running: ${blameCmd}`);
+      const { stdout: blameOut } = await execAsync(blameCmd);
+      console.log("Blame output:\n", blameOut);
+
+      const commitHash = blameOut.split(" ")[0].replace(/\^|\(|\)/g, "");
+      console.log("Commit hash for line", lineno, "=", commitHash);
+
+      const showCmd = `git show --no-patch --format="%ae" ${commitHash}`;
+      const { stdout: emailOut } = await execAsync(showCmd);
+      const authorEmail = emailOut.trim();
+      console.log("Author email for line", lineno, "=", authorEmail);
+
+      if (!lastCommitterEmail) {
+        lastCommitterEmail = authorEmail;
+      }
+
       const snippet = await fetchCodeSnippetFromGitHub(
         ghToken,
-        "T-unity",  // リポジトリオーナー
-        "sentry",   // リポジトリ名
-        filename,   // 将来的にはパス整形後のfilenameを使う
-        "main",     // ブランチ名
+        "T-unity",
+        "sentry",
+        filename,
+        "main",
         lineno,
         5
       );
 
       codeSnippets += `### Code snippet: ${filename} (around line ${lineno})\n`;
-      codeSnippets += "```go\n";  // 言語をGoと想定
+      codeSnippets += "```go\n";
       codeSnippets += snippet;
       codeSnippets += "\n```\n\n";
     }
 
-    // 3. AIへ投げるプロンプトを組み立てる (フォーマット改善版)
     let prompt = `
 以下のIssue情報を解析し、次の項目をMarkdownで出力してください:
 
 1. **バグの簡単な要約**
 2. **考えられる原因** (箇条書き)
 3. **修正の方向性** (可能ならコード例や具体的対策を示す)
-4. **緊急度 (High / Medium / Low)**  
-  - なぜその緊急度と判断したか簡潔に
+4. **緊急度 (High / Medium / Low)**
 5. **その他の補足点・懸念点**
 
 # Issue Title
@@ -61,7 +80,6 @@ ${codeSnippets}
     console.log(prompt);
     console.log("===== End of Prompt =====");
     
-    // 4. OpenAI APIへリクエスト
     const endpoint = "https://api.openai.com/v1/chat/completions";
     const requestBody = {
       model: "gpt-4o-mini",
@@ -71,7 +89,7 @@ ${codeSnippets}
           content: prompt,
         },
       ],
-      max_tokens: 1000, // 余裕を持たせる
+      max_tokens: 1000,
       temperature: 0.3,
     };
 
@@ -91,8 +109,16 @@ ${codeSnippets}
     const data = await response.json();
     const aiResult = data?.choices?.[0]?.message?.content || "(No response)";
 
-    // 5. コンソール出力 (→ GitHub ActionsがこれをCommentに書き込む)
-    console.log(aiResult);
+    let finalComment = aiResult;
+    if (lastCommitterEmail) {
+      finalComment += `
+
+---
+**Last Committer (line blame)**: \`${lastCommitterEmail}\`
+`;
+    }
+
+    console.log(finalComment);
 
   } catch (error) {
     console.error("Error in triage-ai script:", error);
@@ -100,11 +126,12 @@ ${codeSnippets}
   }
 })();
 
+
 /**
- * fetchCodeSnippetFromGitHub(token, owner, repo, path, ref, centerLine, context)
+ * 例: GitHub APIからコードスニペットを取得
  */
 async function fetchCodeSnippetFromGitHub(token, owner, repo, path, ref, centerLine, contextLines) {
-  // FIXME: path は今は固定で "main.go" のように書き換えている場合があるので将来的に調整
+  // ↓ 現状は強制で main.go になっているので注意
   const url = `https://api.github.com/repos/${owner}/${repo}/contents/main.go?ref=${ref}`;
   console.log("Fetching URL:", url);
 
@@ -118,18 +145,16 @@ async function fetchCodeSnippetFromGitHub(token, owner, repo, path, ref, centerL
     throw new Error(`Failed to fetch file from GitHub: ${resp.status} - ${await resp.text()}`);
   }
   const json = await resp.json();
-  // File is Base64-encoded
+  
   const contentBase64 = json.content;
   const buff = Buffer.from(contentBase64, 'base64');
   const fileContent = buff.toString('utf-8');
   
-  // 抜き出す範囲を計算
   const lines = fileContent.split('\n');
-  const start = Math.max(0, centerLine - contextLines - 1);  // 1-based -> 0-based
+  const start = Math.max(0, centerLine - contextLines - 1); // 1-based -> 0-based
   const end = Math.min(lines.length, centerLine + contextLines);
   const snippet = lines.slice(start, end).map((l, i) => {
-    // 行番号を表示 (1-basedで再計算)
-    const actualLine = start + i + 1;
+    const actualLine = start + i + 1; 
     return `${actualLine}: ${l}`;
   }).join('\n');
 
