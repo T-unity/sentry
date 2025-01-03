@@ -51,6 +51,10 @@ ${issueBody}
 ${codeSnippets}
 `;
 
+console.log("===== Prompt to AI =====");
+console.log(prompt);
+console.log("===== End of Prompt =====");
+    
     // 4. OpenAI APIへリクエスト
     const endpoint = "https://api.openai.com/v1/chat/completions";
     const requestBody = {
