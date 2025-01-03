@@ -27,10 +27,8 @@ jobs:
         with:
           node-version: 22
 
-      - name: Install Dependencies
-        run: npm install openai@3.2.1
-
       - name: AI Triage
+        id: ai-triage
         run: node .github/scripts/triage-ai.js
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
