@@ -29,7 +29,9 @@ jobs:
 
       - name: AI Triage
         id: ai-triage
-        run: node .github/scripts/triage-ai.js
+        run: |
+          node .github/scripts/triage-ai.js > ai_output.txt
+          echo "commentBody=$(cat ai_output.txt)" >> $GITHUB_OUTPUT
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ISSUE_BODY: ${{ github.event.issue.body }}
@@ -40,4 +42,4 @@ jobs:
         uses: actions-ecosystem/action-create-comment@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          body: ${{ steps.ai-triage-parse.outputs.commentBody }}
+          body: ${{ steps.ai-triage.outputs.commentBody }}

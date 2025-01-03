@@ -10,16 +10,13 @@
 
 # Issue Title
 ${issueTitle}
-
 # Issue URL
 ${issueUrl}
-
 # Issue Body
 ${issueBody}
 `;
 
     const endpoint = "https://api.openai.com/v1/chat/completions";
-
     const requestBody = {
       model: "gpt-4o-mini",
       messages: [
@@ -36,24 +33,20 @@ ${issueBody}
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
-      throw new Error(
-        `OpenAI API error: ${response.status} - ${await response.text()}`
-      );
+      throw new Error(`OpenAI API error: ${response.status} - ${await response.text()}`);
     }
 
     const data = await response.json();
-
     const aiResult = data?.choices?.[0]?.message?.content || "(No response)";
 
-    console.log("AI Triage Result:\n", aiResult);
-    console.log(`::set-output name=commentBody::${aiResult.replace(/\r?\n/g, "%0A")}`);
-
+    // 単純に標準出力へ
+    console.log(aiResult);
   } catch (error) {
     console.error("Error in triage-ai script:", error);
     process.exit(1);
