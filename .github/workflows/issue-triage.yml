@@ -31,7 +31,9 @@ jobs:
         id: ai-triage
         run: |
           node .github/scripts/triage-ai.js > ai_output.txt
-          echo "commentBody=$(cat ai_output.txt)" >> $GITHUB_OUTPUT
+          echo "commentBody<<EOF" >> $GITHUB_OUTPUT
+          cat ai_output.txt >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ISSUE_BODY: ${{ github.event.issue.body }}

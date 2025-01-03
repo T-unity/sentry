@@ -45,8 +45,8 @@ ${issueBody}
     const data = await response.json();
     const aiResult = data?.choices?.[0]?.message?.content || "(No response)";
 
-    // 単純に標準出力へ
     console.log(aiResult);
+
   } catch (error) {
     console.error("Error in triage-ai script:", error);
     process.exit(1);
