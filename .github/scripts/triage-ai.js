@@ -96,6 +96,8 @@ ${codeSnippets}
  */
 async function fetchCodeSnippetFromGitHub(token, owner, repo, path, ref, centerLine, contextLines) {
   const url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${ref}`;
+  console.log("Fetching URL:", url);
+
   const resp = await fetch(url, {
     headers: {
       Authorization: `Bearer ${token}`,
