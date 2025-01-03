@@ -2,22 +2,17 @@ name: AI Triage
 
 on:
   issues:
-    types: [opened, labeled]
+    types: [opened]
 
 jobs:
   triage:
     runs-on: ubuntu-latest
 
-    if: |
-      (
-        github.event.action == 'opened' &&
-        contains(toJson(github.event.issue.labels), 'bug auto triage')
-      )
-      ||
-      (
-        github.event.action == 'labeled' &&
-        github.event.label.name == 'bug auto triage'
-      )
+    # 「Issueがopenedされた」かつ「既に 'bug auto triage' ラベルが含まれている」場合のみ実行
+    if: >
+      github.event.action == 'opened' &&
+      contains(toJson(github.event.issue.labels), 'bug auto triage')
+
     steps:
       - name: Check out code
         uses: actions/checkout@v3
@@ -40,6 +35,7 @@ jobs:
           ISSUE_TITLE: ${{ github.event.issue.title }}
           ISSUE_URL: ${{ github.event.issue.html_url }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
       - name: Create Comment
         uses: actions-ecosystem/action-create-comment@v1
