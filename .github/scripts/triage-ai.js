@@ -20,8 +20,9 @@ const execAsync = promisify(exec);
       if (!match) continue;
       const filename = match[1];
       const lineno = parseInt(match[3]);
+      const shortPath = filename.split("/").pop();
 
-      const blameCmd = `git blame -L ${lineno},${lineno} ${filename}`;
+      const blameCmd = `git blame -L ${lineno},${lineno} ${shortPath}`;
       console.log(`Running: ${blameCmd}`);
       const { stdout: blameOut } = await execAsync(blameCmd);
       console.log("Blame output:\n", blameOut);
@@ -131,8 +132,8 @@ ${codeSnippets}
  * 例: GitHub APIからコードスニペットを取得
  */
 async function fetchCodeSnippetFromGitHub(token, owner, repo, path, ref, centerLine, contextLines) {
-  // ↓ 現状は強制で main.go になっているので注意
-  const url = `https://api.github.com/repos/${owner}/${repo}/contents/main.go?ref=${ref}`;
+  const shortPath = filename.split("/").pop();
+  const url = `https://api.github.com/repos/${owner}/${repo}/contents/${shortPath}?ref=${ref}`;
   console.log("Fetching URL:", url);
 
   const resp = await fetch(url, {
