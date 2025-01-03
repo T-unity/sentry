@@ -6,44 +6,50 @@
     const issueUrl = process.env.ISSUE_URL || "";
     const ghToken = process.env.GITHUB_TOKEN;
     
-    // 1. スタックトレース情報をIssue本文から抽出 (簡単な正規表現例)
-    //    例: "| `main.go` | `main` | `25` |" の行を探す
+    // 1. スタックトレース情報をIssue本文から抽出
     const stackLines = issueBody.match(/\|\s*`([^`]+)`\s*\|\s*`([^`]+)`\s*\|\s*`(\d+)`\s*\|/g) || [];
     let codeSnippets = "";
     
     for (const line of stackLines) {
-      // line 例: "| `main.go` | `main` | `25` |"
       const match = line.match(/\|\s*`([^`]+)`\s*\|\s*`([^`]+)`\s*\|\s*`(\d+)`\s*\|/);
       if (!match) continue;
-      const filename = match[1]; // main.go
-      const lineno = parseInt(match[3]); // 25
+      const filename = match[1]; // e.g. "main.go"
+      const lineno = parseInt(match[3]); // e.g. 25
 
-      // 2. GitHub API でこのファイルを取得
-      //    例: GET /repos/{owner}/{repo}/contents/{filename}?ref=main
+      // 2. GitHub API で前後5行のコードを取得する (現時点では main.go を強制)
       const snippet = await fetchCodeSnippetFromGitHub(
         ghToken,
         "T-unity",  // リポジトリオーナー
         "sentry",   // リポジトリ名
-        filename,
+        filename,   // 将来的にはパス整形後のfilenameを使う
         "main",     // ブランチ名
         lineno,
-        5          // 前後5行取得 (任意)
+        5
       );
 
       codeSnippets += `### Code snippet: ${filename} (around line ${lineno})\n`;
-      codeSnippets += "```go\n";  // 言語は任意
+      codeSnippets += "```go\n";  // 言語をGoと想定
       codeSnippets += snippet;
       codeSnippets += "\n```\n\n";
     }
 
-    // 3. AIへ投げるプロンプトを組み立てる
+    // 3. AIへ投げるプロンプトを組み立てる (フォーマット改善版)
     let prompt = `
-以下のIssue情報を解析して、バグの簡単な要約、考えられる原因、対策案、緊急度を示してください。
+以下のIssue情報を解析し、次の項目をMarkdownで出力してください:
+
+1. **バグの簡単な要約**
+2. **考えられる原因** (箇条書き)
+3. **修正の方向性** (可能ならコード例や具体的対策を示す)
+4. **緊急度 (High / Medium / Low)**  
+  - なぜその緊急度と判断したか簡潔に
+5. **その他の補足点・懸念点**
 
 # Issue Title
 ${issueTitle}
+
 # Issue URL
 ${issueUrl}
+
 # Issue Body
 ${issueBody}
 
@@ -51,9 +57,9 @@ ${issueBody}
 ${codeSnippets}
 `;
 
-console.log("===== Prompt to AI =====");
-console.log(prompt);
-console.log("===== End of Prompt =====");
+    console.log("===== Prompt to AI =====");
+    console.log(prompt);
+    console.log("===== End of Prompt =====");
     
     // 4. OpenAI APIへリクエスト
     const endpoint = "https://api.openai.com/v1/chat/completions";
@@ -65,8 +71,8 @@ console.log("===== End of Prompt =====");
           content: prompt,
         },
       ],
-      max_tokens: 500,
-      temperature: 0.2,
+      max_tokens: 1000, // 余裕を持たせる
+      temperature: 0.3,
     };
 
     const response = await fetch(endpoint, {
@@ -96,13 +102,11 @@ console.log("===== End of Prompt =====");
 
 /**
  * fetchCodeSnippetFromGitHub(token, owner, repo, path, ref, centerLine, context)
- * → GitHub REST API /contents でファイルを取得し、行番号周辺を抜き出す例
  */
 async function fetchCodeSnippetFromGitHub(token, owner, repo, path, ref, centerLine, contextLines) {
-  // const url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${ref}`;
-  // FIXME:
+  // FIXME: path は今は固定で "main.go" のように書き換えている場合があるので将来的に調整
   const url = `https://api.github.com/repos/${owner}/${repo}/contents/main.go?ref=${ref}`;
-  // console.log("Fetching URL:", url);
+  console.log("Fetching URL:", url);
 
   const resp = await fetch(url, {
     headers: {
